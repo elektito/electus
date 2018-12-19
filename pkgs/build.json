@@ -1,0 +1,7 @@
+{
+    "env": {
+        "name": "ubuntu",
+        "version": "18.04",
+        "arch": "x86_64"
+    }
+}

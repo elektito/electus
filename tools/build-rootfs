@@ -1,0 +1,27 @@
+#!/bin/bash -e
+
+mkdir rootfs
+
+while [ $# -gt 0 ]; do
+    pkg="$1"
+
+    files=$(find -name "$pkg*.tar.xz")
+    if [ -z $files ]; then
+        echo "Package not found: $pkg"
+        exit
+    fi
+
+    nfiles=$(echo $nfiles | wc -l)
+    if [ "$nfiles" -gt 1 ]; then
+        echo "More than one candidates exist for package: $pkg"
+        for f in $files; do
+            echo "    $f"
+        done
+        exit
+    fi
+
+    pkgfile=$files
+
+    tar -C rootfs/ --strip-components=2 -xf $pkgfile $pkg/fs
+    shift
+done

@@ -1,0 +1,172 @@
+#!/bin/bash -e
+
+# quiet version of pushd
+pushd()
+{
+    command pushd "$@" > /dev/null
+}
+
+# quiet version of popd
+popd()
+{
+    command popd "$@" > /dev/null
+}
+
+read_options()
+{
+    TMPDIR=/tmp
+    DIRS=
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --help|-h)
+                echo "Usage: $0 [options] [pkg]..."
+                echo ""
+                echo "Builds the specified packages. If no package names are "
+                echo "passed, all available packages are built."
+                echo ""
+                echo "-h, --help        show this help message."
+                echo "-p, --tmpdir=DIR  use DIR instead of /tmp as the location"
+                echo "                  for intermediary files."
+                exit
+                ;;
+            --tmpdir|-p)
+                TMPDIR="$2"
+                shift
+                ;;
+            *)
+                DIRS="$DIRS $1"
+                break
+        esac
+        shift
+    done
+
+    if [ -z "$DIRS" ]; then
+        DIRS=$(ls -d */)
+    fi
+
+    NDIRS=$(echo $DIRS | wc -l)
+}
+
+check_build_environment()
+{
+    expected_name=$(jq -r .env.name build.json)
+    expected_ver=$(jq -r .env.version build.json)
+    expected_arch=$(jq -r .env.arch build.json)
+
+    name=$(lsb_release --short --id | awk '{print tolower($0)}')
+    ver=$(lsb_release --short --release)
+    arch=$(arch)
+
+    if [ $name != $expected_name -o $ver != $expected_ver -o $arch != $expected_arch ]; then
+        echo "Invalid environment."
+        echo "    Expected: $expected_name $expected_ver $expected_arch"
+        echo "    Found: $name $ver $arch"
+        exit 1
+    fi
+}
+
+build_pkg()
+{
+    pkg=$1
+
+    echo "building package: $pkg"
+
+    if [ ! -d $pkg ]; then
+        echo "    No such package directory: $pkg"
+        exit 1
+    fi
+
+    cd $pkg
+
+    ver=$(jq -r .version pkg.json)
+
+    echo "    version: $ver"
+
+    tmpdir=$(mktemp -p $TMPDIR -d)
+
+    echo "Copying package files..."
+    cp -r ../$pkg $tmpdir/pkg
+
+    pushd .
+    srctype=$(jq -r .source.type pkg.json)
+    case $srctype in
+        local)
+            ;;
+
+        git)
+            location=$(jq -r .source.location pkg.json)
+            tag=$(jq -r .source.tag pkg.json)
+            git clone $location -b $tag $tmpdir/_src_
+            ;;
+
+        dl)
+            location=$(jq -r .source.location pkg.json)
+            if [ "$(jq .source.location_filename pkg.json)" = "null" ]; then
+                filename=$(basename $location)
+            else
+                filename=$(jq -r .source.location_filename pkg.json)
+            fi
+            echo buz
+            inner_dir=$(jq -r .source.inner_dir pkg.json)
+            curl $location -o $tmpdir/$filename
+            tar -C $tmpdir -xf $tmpdir/$filename
+            mv $tmpdir/$inner_dir $tmpdir/_src_
+            ;;
+
+        *)
+            echo "Unknown source type: $srctype"
+            ;;
+    esac
+
+    npatches=$(jq -r '.patches.files | length' pkg.json)
+    if [ $npatches -gt 0 ]; then
+        echo "Applying ${npatches} patche(s)..."
+        options=$(jq -r '.patches.options' pkg.json)
+        apply_dir=$(jq -r '.patches.apply_dir' pkg.json)
+        files=$(jq -r '.patches.files[]' pkg.json)
+        cd $tmpdir/_src_/$apply_dir
+        for patch in $files; do
+            patch $options <$tmpdir/pkg/$patch
+        done
+        cd -
+    fi
+
+    echo "Building..."
+    cores=$(grep -c ^processor /proc/cpuinfo)
+    make all -j$cores -C $tmpdir/pkg
+
+    echo "Installing..."
+    mkdir -p $tmpdir/$pkg/fs
+    export INSTDIR=$tmpdir/$pkg/fs
+    make install -C $tmpdir/pkg
+
+    touch $tmpdir/$pkg/ELECTUS
+
+    echo "Compressing package..."
+    tar -cJf $output_dir/$pkg-$ver.tar.xz -C $tmpdir $pkg
+
+    rm -rf $tmpdir
+
+    popd
+}
+
+read_options "$@"
+
+output_dir=$(pwd)
+cd ../pkgs
+check_build_environment
+
+#if [ "$#" -eq 0 ]; then
+#    dirs=$(ls -d */)
+#    ndirs=$(echo $dirs | wc -w)
+#else
+#    dirs="$@"
+#    ndirs=$(echo $dirs | wc -w)
+#fi
+
+echo "Building $NDIRS package(s)..."
+
+for d in $DIRS; do
+    build_pkg $d
+done
