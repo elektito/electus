@@ -58,8 +58,13 @@ main(int argc, char *argv[])
     return 1;
   }
 
+  printf("Hello, World!\n");
+  printf("This is hello, your friendly init system!\n");
+
+  printf("Attempting to run your rc.local...\n");
   run_program("/etc/rc.local");
 
+  printf("Launching your shell...\n");
   launch_login();
 
   for (;;) {
