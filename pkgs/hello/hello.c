@@ -54,7 +54,7 @@ main(int argc, char *argv[])
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
   if (sigaction(SIGCHLD, &sa, 0) == -1) {
-    perror(0);
+    printf("Could not install signal handler. Aborting.\n");
     return 1;
   }
 
