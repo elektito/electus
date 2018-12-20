@@ -139,12 +139,13 @@ build_pkg()
     echo "Installing..."
     mkdir -p $tmpdir/$pkg/fs
     export INSTDIR=$tmpdir/$pkg/fs
-    make install -C $tmpdir/pkg
+    fakeroot_file=$(mktemp)
+    fakeroot -s $fakeroot_file -- make install -C $tmpdir/pkg
 
-    touch $tmpdir/$pkg/ELECTUS
+    fakeroot -i $fakeroot_file -s fakeroot_file -- touch $tmpdir/$pkg/ELECTUS
 
     echo "Compressing package..."
-    tar -cJf $output_dir/$pkg-$ver.tar.xz -C $tmpdir $pkg
+    fakeroot -i $fakeroot_file -- tar -cJf $output_dir/$pkg-$ver.tar.xz -C $tmpdir $pkg
 
     rm -rf $tmpdir
 
