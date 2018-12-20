@@ -157,14 +157,6 @@ output_dir=$(pwd)
 cd ../pkgs
 check_build_environment
 
-#if [ "$#" -eq 0 ]; then
-#    dirs=$(ls -d */)
-#    ndirs=$(echo $dirs | wc -w)
-#else
-#    dirs="$@"
-#    ndirs=$(echo $dirs | wc -w)
-#fi
-
 echo "Building $NDIRS package(s)..."
 
 for d in $DIRS; do
