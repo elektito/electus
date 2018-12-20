@@ -25,3 +25,7 @@ while [ $# -gt 0 ]; do
     tar -C rootfs/ --strip-components=2 -xf $pkgfile $pkg/fs
     shift
 done
+
+mkdir rootfs/dev
+mkdir rootfs/proc
+mkdir rootfs/sys
