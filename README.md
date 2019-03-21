@@ -1,4 +1,4 @@
-# Electus: Linux Really from Scratch
+# Linux Really from Scratch
 
 See [this post][1] in my blog.
 
